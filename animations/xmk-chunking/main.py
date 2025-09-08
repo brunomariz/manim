@@ -1,8 +1,15 @@
 from manim import *
 
 
-class Chunking(Scene):
-    def create_grid(self, entries, cell_size):
+class Grid:
+
+    def __init__(self, entries, cell_size, fill, opacity):
+        self._entries = entries
+        self._grid_vgroup = self._create_grid_vgroup(entries, cell_size, fill, opacity)
+        self.fill = fill
+        self.opacity = opacity
+
+    def _create_grid_vgroup(self, entries, cell_size, fill=None, fill_opacity=1):
         n_rows = len(entries)
         n_cols = len(entries[0])
         grid = VGroup()
@@ -10,7 +17,8 @@ class Chunking(Scene):
             row = VGroup()
             for j in range(n_cols):
                 square = Square(side_length=cell_size, color=BLUE)
-                number = Text(entries[i][j]).scale(0.5)
+                square.set_fill(fill, opacity=fill_opacity)
+                number = Text(str(entries[i][j])).scale(0.5)
                 number.move_to(square.get_center())
                 row.add(VGroup(square, number))
             row.arrange(RIGHT, buff=0)
@@ -18,44 +26,60 @@ class Chunking(Scene):
         grid.arrange(DOWN, buff=0)
         return grid
 
-    def split_grid_into_chunks(self, grid, mid_col, halo_width):
-        left_half = VGroup(
-            *[
-                VGroup(*[cell.copy() for cell in row[: mid_col + halo_width]])
-                for row in grid
-            ]
-        )
-        right_half = VGroup(
-            *[
-                VGroup(*[cell.copy() for cell in row[mid_col - halo_width :]])
-                for row in grid
-            ]
-        )
+    def get_vgroup(self):
+        return self._grid_vgroup
 
-        # Place halves over the original grid
-        left_half.align_to(grid.get_left(), LEFT)
-        right_half.align_to(grid.get_right(), RIGHT)
+    def get_entries(self):
+        return self._entries
 
-        # Highlight halves
-        self.play(
-            *[
-                cell[0].animate.set_fill(BLUE, opacity=0.25)
-                for row in left_half
-                for cell in row
-            ]
-        )
-        self.play(
-            *[
-                cell[0].animate.set_fill(TEAL, opacity=0.25)
-                for row in right_half
-                for cell in row
-            ]
-        )
+    def set_entry(self, i, j, val: float):
+        self._entries[i][j] = val
 
-        self.add(left_half, right_half)
+    def animate_set_entry(self, i, j, val: float):
+        self.set_entry(i, j, val)
+        square, number = self.get_vgroup()[i][j]
+        return Transform(number, Text(str(val)).scale(0.5).move_to(square.get_center()))
 
-        return left_half, right_half
+    def get_nrows(self):
+        return len(self._entries)
 
+    def get_ncols(self):
+        return len(self._entries[0])
+
+    def animate_highlight_neighbors(self, i, j):
+        neighbors = []
+
+        # Collect neighboring cells (up, down, left, right)
+        if i > 0:
+            neighbors.append(self.get_vgroup()[i - 1][j])
+        if i < self.get_nrows() - 1:
+            neighbors.append(self.get_vgroup()[i + 1][j])
+        if j > 0:
+            neighbors.append(self.get_vgroup()[i][j - 1])
+        if j < self.get_ncols() - 1:
+            neighbors.append(self.get_vgroup()[i][j + 1])
+
+        # Animate neighbor highlight
+        neighbors_colors = [neighbor.get_fill_color() for neighbor in neighbors]
+        neighbors_opacities = [neighbor.get_fill_opacity() for neighbor in neighbors]
+        highlight_anims = [
+            neighbor[0].animate.set_fill(YELLOW, opacity=0.3) for neighbor in neighbors
+        ]
+
+        return highlight_anims
+
+    def animate_reset_fill(self):
+        anims = []
+
+        for row in self.get_vgroup():
+            for cell in row:
+                square, _ = cell
+                anims.append(square.animate.set_fill(self.fill, self.opacity))
+
+        return anims
+
+
+class Chunking5p(Scene):
     def create_gpu_rect(self, entries, cell_size, halo_width):
         n_cols = len(entries[0])
         mid_col = n_cols // 2 + n_cols % 2
@@ -71,141 +95,119 @@ class Chunking(Scene):
         # GPU label
         gpu_label = Text("GPU", font_size=36)
         gpu_label.next_to(gpu_rect, UP, buff=0.2)  # position above the rectangle
-        self.play(Create(gpu_rect), Write(gpu_label))
 
-        return gpu_rect
-
-    def update_cell_with_neighbors(
-        self, grid, i, j, new_value, duration=0.2, highlight_opacity=0.8
-    ):
-        """
-        Updates grid[i][j] with new_value and temporarily increases the opacity of its neighbors
-        """
-        n_rows = len(grid)
-        n_cols = len(grid[0])
-        neighbors = []
-
-        # Collect neighboring cells (up, down, left, right)
-        if i > 0:
-            neighbors.append(grid[i - 1][j])
-        if i < n_rows - 1:
-            neighbors.append(grid[i + 1][j])
-        if j > 0:
-            neighbors.append(grid[i][j - 1])
-        if j < n_cols - 1:
-            neighbors.append(grid[i][j + 1])
-
-        # Animate neighbor highlight
-        highlight_anims = [
-            neighbor[0].animate.set_fill(YELLOW, opacity=highlight_opacity)
-            for neighbor in neighbors
-        ]
-        self.play(*highlight_anims, run_time=duration / 2)
-
-        # Update the center cell
-        square, number = grid[i][j]
-        self.play(
-            Transform(number, Text(new_value).scale(0.5).move_to(square.get_center())),
-            run_time=duration,
-        )
-
-        # Restore neighbor opacity
-        restore_anims = [
-            neighbor[0].animate.set_fill(BLUE, opacity=0.5) for neighbor in neighbors
-        ]
-        self.play(*restore_anims, run_time=duration / 2)
-
-    def update_chunk(self, chunk, gpu_rect, entries, index):
-        n_cols = len(entries[0])
-        mid_col = n_cols // 2 + n_cols % 2
-        # Record original positions
-        left_pos = chunk.get_center()
-
-        # Move chunk to GPU rectangles
-        self.play(chunk.animate.move_to(gpu_rect.get_center()))
-
-        # Example: update numbers in left half
-        for i, row in enumerate(chunk):
-            for j, cell in enumerate(row):
-                if index == 0:
-                    if not (
-                        (i == 0)
-                        or (j == 0)
-                        or (i == (len(chunk) - 1))
-                        or (j == len(chunk[0]) - 1)
-                    ):
-                        square, number = cell
-                        new_value = str(int(number.text) + 1)
-                        self.update_cell_with_neighbors(
-                            chunk, i, j, new_value, duration=0.07, highlight_opacity=0.2
-                        )
-                elif index == 1:
-                    if not (
-                        (i == 0)
-                        or (j == 0)
-                        or (j == len(chunk[0]) - 1)
-                        or (i == (len(chunk) - 1))
-                    ):
-                        square, number = cell
-                        new_value = str(int(number.text) + 1)
-                        self.update_cell_with_neighbors(
-                            chunk, i, j, new_value, duration=0.07, highlight_opacity=0.2
-                        )
-
-        # Move halves back to original positions
-        self.play(chunk.animate.move_to(left_pos))
-
-    def exchange_halos(self, chunk0, chunk1, halo_width):
-        for i, row in enumerate(chunk0):
-            for h in range(halo_width):
-                j_0 = len(chunk0[0]) - 1 + h
-                j_1 = 0 + h
-                square0, text0 = chunk0[i][j_0]
-                square1, text1 = chunk1[i][j_1]
-                new_value0 = text1.text
-                self.play(
-                    Transform(
-                        text0,
-                        Text(new_value0).scale(0.5).move_to(square0.get_center()),
-                    ),
-                    run_time=0.2,
-                )
+        return gpu_rect, gpu_label
 
     def construct(self):
-        entries = [
-            ["0", "0", "0", "0", "0", "0", "0", "0", "0", "0"],
-            ["0", "1", "1", "1", "1", "1", "1", "1", "1", "0"],
-            ["0", "1", "1", "1", "1", "1", "1", "1", "1", "0"],
-            ["0", "1", "1", "1", "1", "1", "1", "1", "1", "0"],
-            ["0", "1", "1", "1", "1", "1", "1", "1", "1", "0"],
-            ["0", "1", "1", "1", "1", "1", "1", "1", "1", "0"],
-            ["0", "1", "1", "1", "1", "1", "1", "1", "1", "0"],
-            ["0", "1", "1", "1", "1", "1", "1", "1", "1", "0"],
-            ["0", "1", "1", "1", "1", "1", "1", "1", "1", "0"],
-            ["0", "0", "0", "0", "0", "0", "0", "0", "0", "0"],
+        initial_entries = [
+            [0, 0, 0, 0, 0],
+            [0, 1, 1, 1, 0],
+            [0, 1, 1, 1, 0],
+            [0, 1, 1, 1, 0],
+            [0, 0, 0, 0, 0],
         ]
 
-        cell_size = 0.5 * len(entries) / 8
+        grid = Grid(initial_entries, 0.8, None, 0)
+
+        mid_col = grid.get_ncols() // 2 + grid.get_ncols() % 2
         halo_width = 1
-        n_cols = len(entries[0])
-        mid_col = n_cols // 2 + n_cols % 2
+        left_chunk = Grid(
+            [
+                entry
+                for entry in [row[: mid_col + halo_width] for row in grid.get_entries()]
+            ],
+            0.8,
+            fill=BLUE,
+            opacity=0.2,
+        )
+        right_chunk = Grid(
+            [
+                entry
+                for entry in [row[mid_col - halo_width :] for row in grid.get_entries()]
+            ],
+            0.8,
+            fill=GREEN,
+            opacity=0.2,
+        )
 
-        grid = self.create_grid(entries, cell_size)
-        grid.to_edge(LEFT)
-        self.play(FadeIn(grid))
+        grid.get_vgroup().to_edge(LEFT)
 
-        # GPU rectangle
-        gpu_rect = self.create_gpu_rect(entries, cell_size, halo_width)
+        left_chunk.get_vgroup().align_to(grid.get_vgroup().get_left(), LEFT)
+        right_chunk.get_vgroup().align_to(grid.get_vgroup().get_right(), RIGHT)
 
-        # Create **left and right halves with halo copies**
-        left_half, right_half = self.split_grid_into_chunks(grid, mid_col, halo_width)
+        self.play(FadeIn(grid.get_vgroup()))
+        self.play(FadeIn(left_chunk.get_vgroup()))
+        self.play(FadeIn(right_chunk.get_vgroup()))
 
-        self.play(FadeOut(grid))
+        self.play(FadeOut(grid.get_vgroup()))
 
-        self.update_chunk(left_half, gpu_rect, entries, index=0)
+        gpu_rect, gpu_label = self.create_gpu_rect(grid.get_entries(), 0.5, halo_width)
+        self.play(Create(gpu_rect), Write(gpu_label))
 
-        self.update_chunk(right_half, gpu_rect, entries, index=1)
+        left_pos = left_chunk.get_vgroup().get_center()
+        anim = left_chunk.get_vgroup().animate.move_to(gpu_rect.get_center())
+        self.play(anim)
+        x_m = 1
+        x_M = 4
+        y_m = 1
+        y_M = 3
+        for i in range(x_m, x_M):
+            for j in range(y_m, y_M):
+                highlight_anim = left_chunk.animate_highlight_neighbors(i, j)
+                set_entry_anim = left_chunk.animate_set_entry(
+                    i, j, left_chunk.get_entries()[i][j] + 1
+                )
+                self.play(highlight_anim, set_entry_anim, run_time=0.2)
+                anim = left_chunk.animate_reset_fill()
+                self.play(anim, run_time=0.2)
+        self.play(left_chunk.get_vgroup().animate.move_to(left_pos))
 
-        # self.exchange_halos(left_half, right_half)
+        right_pos = right_chunk.get_vgroup().get_center()
+        anim = right_chunk.get_vgroup().animate.move_to(gpu_rect.get_center())
+        self.play(anim)
+        x_m = 1
+        x_M = 4
+        y_m = 1
+        y_M = 2
+        anims = []
+        for i in range(x_m, x_M):
+            for j in range(y_m, y_M):
+                highlight_anim = right_chunk.animate_highlight_neighbors(i, j)
+                set_entry_anim = right_chunk.animate_set_entry(
+                    i, j, right_chunk.get_entries()[i][j] + 1
+                )
+                rst_anim = right_chunk.animate_reset_fill()
+                anims.append(highlight_anim)
+                anims.append(set_entry_anim)
+                anims.append(rst_anim)
+        self.play(*anims, run_time=1)
+
+        self.play(right_chunk.get_vgroup().animate.next_to(left_chunk.get_vgroup()))
+        x_m = 0
+        x_M = 5
+        y_m = 3
+        y_M = 4
+        for x in range(x_m, x_M):
+            for y in range(y_m, y_M):
+                y_right = y - 2
+                set_entry_anim = left_chunk.animate_set_entry(
+                    x, y, right_chunk.get_entries()[x][y_right]
+                )
+
+                self.play(set_entry_anim, run_time=0.2)
+        x_m = 0
+        x_M = 5
+        y_m = 0
+        y_M = 1
+        for x in range(x_m, x_M):
+            for y in range(y_m, y_M):
+                y_left = y + 2
+                set_entry_anim = right_chunk.animate_set_entry(
+                    x, y, left_chunk.get_entries()[x][y_left]
+                )
+
+                self.play(set_entry_anim, run_time=0.2)
+
+        self.play(right_chunk.get_vgroup().animate.move_to(right_pos))
 
         self.wait()
