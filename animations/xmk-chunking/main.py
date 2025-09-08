@@ -100,13 +100,16 @@ class Chunking5p(Scene):
 
     def construct(self):
         initial_entries = [
-            [0, 0, 0, 0, 0],
-            [0, 1, 1, 1, 0],
-            [0, 1, 1, 1, 0],
-            [0, 1, 1, 1, 0],
-            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
         ]
-        cell_size = 0.8
+        cell_size = 0.5
 
         grid = Grid(initial_entries, cell_size, None, 0)
 
@@ -154,47 +157,57 @@ class Chunking5p(Scene):
         anim = left_chunk.get_vgroup().animate.move_to(gpu_rect.get_center())
         self.play(anim)
         x_m = 1
-        x_M = 4
+        x_M = left_chunk.get_nrows() - 2
         y_m = 1
-        y_M = 3
-        for i in range(x_m, x_M):
-            for j in range(y_m, y_M):
-                highlight_anim = left_chunk.animate_highlight_neighbors(i, j)
+        y_M = left_chunk.get_ncols() - 2
+        anims = []
+        for x in range(x_m, x_M + 1):
+            for y in range(y_m, y_M + 1):
                 set_entry_anim = left_chunk.animate_set_entry(
-                    i, j, left_chunk.get_entries()[i][j] + 1
+                    x, y, left_chunk.get_entries()[x][y] + 1
                 )
-                self.play(highlight_anim, set_entry_anim, run_time=0.2)
-                anim = left_chunk.animate_reset_fill()
-                self.play(anim, run_time=0.2)
+                if x * left_chunk.get_ncols() + y < 5 + left_chunk.get_ncols():
+                    highlight_anim = left_chunk.animate_highlight_neighbors(x, y)
+                    self.play(highlight_anim, set_entry_anim, run_time=0.2)
+                    anim = left_chunk.animate_reset_fill()
+                    self.play(anim, run_time=0.2)
+                    self.play(set_entry_anim, run_time=0.2)
+                else:
+                    anims.append(set_entry_anim)
+        self.play(*anims, run_time=1)
+
         self.play(left_chunk.get_vgroup().animate.move_to(left_pos))
 
         right_pos = right_chunk.get_vgroup().get_center()
         anim = right_chunk.get_vgroup().animate.move_to(gpu_rect.get_center())
         self.play(anim)
         x_m = 1
-        x_M = 4
+        x_M = right_chunk.get_nrows() - 2
         y_m = 1
-        y_M = 2
+        y_M = right_chunk.get_ncols() - 2
         anims = []
-        for i in range(x_m, x_M):
-            for j in range(y_m, y_M):
-                highlight_anim = right_chunk.animate_highlight_neighbors(i, j)
+        for x in range(x_m, x_M + 1):
+            for y in range(y_m, y_M + 1):
                 set_entry_anim = right_chunk.animate_set_entry(
-                    i, j, right_chunk.get_entries()[i][j] + 1
+                    x, y, right_chunk.get_entries()[x][y] + 1
                 )
-                rst_anim = right_chunk.animate_reset_fill()
-                anims.append(highlight_anim)
-                anims.append(set_entry_anim)
-                anims.append(rst_anim)
+                if x * right_chunk.get_ncols() + y < 5 + right_chunk.get_ncols():
+                    highlight_anim = right_chunk.animate_highlight_neighbors(x, y)
+                    self.play(highlight_anim, set_entry_anim, run_time=0.2)
+                    anim = right_chunk.animate_reset_fill()
+                    self.play(anim, run_time=0.2)
+                    self.play(set_entry_anim, run_time=0.2)
+                else:
+                    anims.append(set_entry_anim)
         self.play(*anims, run_time=1)
 
         self.play(right_chunk.get_vgroup().animate.next_to(left_chunk.get_vgroup()))
         x_m = 0
-        x_M = 5
-        y_m = 3
-        y_M = 4
-        for x in range(x_m, x_M):
-            for y in range(y_m, y_M):
+        x_M = left_chunk.get_nrows() - 1
+        y_m = left_chunk.get_ncols() - 1
+        y_M = left_chunk.get_ncols() - 1
+        for x in range(x_m, x_M + 1):
+            for y in range(y_m, y_M + 1):
                 y_right = y - 2
                 set_entry_anim = left_chunk.animate_set_entry(
                     x, y, right_chunk.get_entries()[x][y_right]
@@ -202,11 +215,11 @@ class Chunking5p(Scene):
 
                 self.play(set_entry_anim, run_time=0.2)
         x_m = 0
-        x_M = 5
+        x_M = left_chunk.get_nrows() - 1
         y_m = 0
-        y_M = 1
-        for x in range(x_m, x_M):
-            for y in range(y_m, y_M):
+        y_M = 0
+        for x in range(x_m, x_M + 1):
+            for y in range(y_m, y_M + 1):
                 y_left = y + 2
                 set_entry_anim = right_chunk.animate_set_entry(
                     x, y, left_chunk.get_entries()[x][y_left]
