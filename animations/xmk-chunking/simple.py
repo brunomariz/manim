@@ -7,7 +7,7 @@ class Chunking(Scene):
         n_cols = len(entries[0])
         # Create full grid of squares with text
         grid = VGroup()
-        for i in range(n_rows):
+        for i in range(n_rows):   
             row = VGroup()
             for j in range(n_cols):
                 square = Square(side_length=cell_size, color=BLUE)
