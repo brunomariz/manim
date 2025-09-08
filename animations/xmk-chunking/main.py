@@ -85,6 +85,12 @@ class Grid:
 
         return anims
 
+    def animate_reset_entry_fill(self, i, j):
+        square, number = self.get_vgroup()[i][j]
+        highlight_anim = square.animate.set_fill(self.fill, self.opacity)
+
+        return highlight_anim
+
 
 class Chunking5p(Scene):
     def create_gpu_rect(self, entries, cell_size, halo_width):
@@ -176,6 +182,9 @@ class Chunking5p(Scene):
                 halo_data_anim = right_chunk.animate_highlight_entry(x, y_right)
 
                 self.play(set_entry_anim, halo_data_anim, run_time=0.2)
+                self.play(
+                    right_chunk.animate_reset_entry_fill(x, y_right), run_time=0.2
+                )
         x_m = 0
         x_M = left_chunk.get_nrows() - 1
         y_m = 0
@@ -189,6 +198,7 @@ class Chunking5p(Scene):
                 halo_data_anim = left_chunk.animate_highlight_entry(x, y_left)
 
                 self.play(set_entry_anim, halo_data_anim, run_time=0.2)
+                self.play(left_chunk.animate_reset_entry_fill(x, y_left), run_time=0.2)
 
         self.play(right_chunk.get_vgroup().animate.move_to(right_pos))
 
@@ -363,6 +373,10 @@ class Chunking5pBlocking(Scene):
                 halo_data_anim = right_chunk.animate_highlight_entry(x, y_right)
 
                 self.play(set_entry_anim, halo_data_anim, run_time=0.2)
+                self.play(
+                    right_chunk.animate_reset_entry_fill(x, y_right), run_time=0.2
+                )
+
         x_m = 0
         x_M = left_chunk.get_nrows() - 1
         y_m = 0
@@ -376,6 +390,7 @@ class Chunking5pBlocking(Scene):
                 halo_data_anim = left_chunk.animate_highlight_entry(x, y_left)
 
                 self.play(set_entry_anim, halo_data_anim, run_time=0.2)
+                self.play(left_chunk.animate_reset_entry_fill(x, y_left), run_time=0.2)
 
         self.play(right_chunk.get_vgroup().animate.move_to(right_pos))
 
