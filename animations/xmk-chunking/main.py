@@ -106,8 +106,9 @@ class Chunking5p(Scene):
             [0, 1, 1, 1, 0],
             [0, 0, 0, 0, 0],
         ]
+        cell_size = 0.8
 
-        grid = Grid(initial_entries, 0.8, None, 0)
+        grid = Grid(initial_entries, cell_size, None, 0)
 
         mid_col = grid.get_ncols() // 2 + grid.get_ncols() % 2
         halo_width = 1
@@ -116,7 +117,7 @@ class Chunking5p(Scene):
                 entry
                 for entry in [row[: mid_col + halo_width] for row in grid.get_entries()]
             ],
-            0.8,
+            cell_size,
             fill=BLUE,
             opacity=0.2,
         )
@@ -125,7 +126,7 @@ class Chunking5p(Scene):
                 entry
                 for entry in [row[mid_col - halo_width :] for row in grid.get_entries()]
             ],
-            0.8,
+            cell_size,
             fill=GREEN,
             opacity=0.2,
         )
@@ -135,14 +136,19 @@ class Chunking5p(Scene):
         left_chunk.get_vgroup().align_to(grid.get_vgroup().get_left(), LEFT)
         right_chunk.get_vgroup().align_to(grid.get_vgroup().get_right(), RIGHT)
 
-        self.play(FadeIn(grid.get_vgroup()))
+        cpu_label = Text("CPU")
+        cpu_label.next_to(grid.get_vgroup(), UP)
+
+        self.play(FadeIn(grid.get_vgroup()), FadeIn(cpu_label))
+
+        gpu_rect, gpu_label = self.create_gpu_rect(
+            grid.get_entries(), cell_size, halo_width
+        )
+        self.play(Create(gpu_rect), Write(gpu_label))
+
         self.play(FadeIn(left_chunk.get_vgroup()))
         self.play(FadeIn(right_chunk.get_vgroup()))
-
         self.play(FadeOut(grid.get_vgroup()))
-
-        gpu_rect, gpu_label = self.create_gpu_rect(grid.get_entries(), 0.5, halo_width)
-        self.play(Create(gpu_rect), Write(gpu_label))
 
         left_pos = left_chunk.get_vgroup().get_center()
         anim = left_chunk.get_vgroup().animate.move_to(gpu_rect.get_center())
