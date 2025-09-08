@@ -26,7 +26,7 @@ class Grid:
         grid.arrange(DOWN, buff=0)
         return grid
 
-    def get_vgroup(self):
+    def get_vgroup(self) -> VGroup:
         return self._grid_vgroup
 
     def get_entries(self):
@@ -67,6 +67,13 @@ class Grid:
         ]
 
         return highlight_anims
+
+    def animate_highlight_entry(self, i, j):
+        # Animate highlight
+        square, number = self.get_vgroup()[i][j]
+        highlight_anim = square.animate.set_fill(YELLOW, opacity=0.3)
+
+        return highlight_anim
 
     def animate_reset_fill(self):
         anims = []
@@ -166,8 +173,9 @@ class Chunking5p(Scene):
                 set_entry_anim = left_chunk.animate_set_entry(
                     x, y, right_chunk.get_entries()[x][y_right]
                 )
+                halo_data_anim = right_chunk.animate_highlight_entry(x, y_right)
 
-                self.play(set_entry_anim, run_time=0.2)
+                self.play(set_entry_anim, halo_data_anim, run_time=0.2)
         x_m = 0
         x_M = left_chunk.get_nrows() - 1
         y_m = 0
@@ -178,8 +186,9 @@ class Chunking5p(Scene):
                 set_entry_anim = right_chunk.animate_set_entry(
                     x, y, left_chunk.get_entries()[x][y_left]
                 )
+                halo_data_anim = left_chunk.animate_highlight_entry(x, y_left)
 
-                self.play(set_entry_anim, run_time=0.2)
+                self.play(set_entry_anim, halo_data_anim, run_time=0.2)
 
         self.play(right_chunk.get_vgroup().animate.move_to(right_pos))
 
@@ -351,8 +360,9 @@ class Chunking5pBlocking(Scene):
                 set_entry_anim = left_chunk.animate_set_entry(
                     x, y, right_chunk.get_entries()[x][y_right]
                 )
+                halo_data_anim = right_chunk.animate_highlight_entry(x, y_right)
 
-                self.play(set_entry_anim, run_time=0.2)
+                self.play(set_entry_anim, halo_data_anim, run_time=0.2)
         x_m = 0
         x_M = left_chunk.get_nrows() - 1
         y_m = 0
@@ -363,8 +373,9 @@ class Chunking5pBlocking(Scene):
                 set_entry_anim = right_chunk.animate_set_entry(
                     x, y, left_chunk.get_entries()[x][y_left]
                 )
+                halo_data_anim = left_chunk.animate_highlight_entry(x, y_left)
 
-                self.play(set_entry_anim, run_time=0.2)
+                self.play(set_entry_anim, halo_data_anim, run_time=0.2)
 
         self.play(right_chunk.get_vgroup().animate.move_to(right_pos))
 
