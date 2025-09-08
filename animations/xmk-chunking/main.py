@@ -67,8 +67,109 @@ class Chunking(Scene):
             height=(1 + padding_y) * cell_size * len(entries),
         )
         gpu_rect.to_edge(RIGHT, buff=2)
-        self.play(Create(gpu_rect))
+
+        # GPU label
+        gpu_label = Text("GPU", font_size=36)
+        gpu_label.next_to(gpu_rect, UP, buff=0.2)  # position above the rectangle
+        self.play(Create(gpu_rect), Write(gpu_label))
+
         return gpu_rect
+
+    def update_cell_with_neighbors(
+        self, grid, i, j, new_value, duration=0.2, highlight_opacity=0.8
+    ):
+        """
+        Updates grid[i][j] with new_value and temporarily increases the opacity of its neighbors
+        """
+        n_rows = len(grid)
+        n_cols = len(grid[0])
+        neighbors = []
+
+        # Collect neighboring cells (up, down, left, right)
+        if i > 0:
+            neighbors.append(grid[i - 1][j])
+        if i < n_rows - 1:
+            neighbors.append(grid[i + 1][j])
+        if j > 0:
+            neighbors.append(grid[i][j - 1])
+        if j < n_cols - 1:
+            neighbors.append(grid[i][j + 1])
+
+        # Animate neighbor highlight
+        highlight_anims = [
+            neighbor[0].animate.set_fill(YELLOW, opacity=highlight_opacity)
+            for neighbor in neighbors
+        ]
+        self.play(*highlight_anims, run_time=duration / 2)
+
+        # Update the center cell
+        square, number = grid[i][j]
+        self.play(
+            Transform(number, Text(new_value).scale(0.5).move_to(square.get_center())),
+            run_time=duration,
+        )
+
+        # Restore neighbor opacity
+        restore_anims = [
+            neighbor[0].animate.set_fill(BLUE, opacity=0.5) for neighbor in neighbors
+        ]
+        self.play(*restore_anims, run_time=duration / 2)
+
+    def update_chunk(self, chunk, gpu_rect, entries, index):
+        n_cols = len(entries[0])
+        mid_col = n_cols // 2 + n_cols % 2
+        # Record original positions
+        left_pos = chunk.get_center()
+
+        # Move chunk to GPU rectangles
+        self.play(chunk.animate.move_to(gpu_rect.get_center()))
+
+        # Example: update numbers in left half
+        for i, row in enumerate(chunk):
+            for j, cell in enumerate(row):
+                if index == 0:
+                    if not (
+                        (i == 0)
+                        or (j == 0)
+                        or (i == (len(chunk) - 1))
+                        or (j == len(chunk[0]) - 1)
+                    ):
+                        square, number = cell
+                        new_value = str(int(number.text) + 1)
+                        self.update_cell_with_neighbors(
+                            chunk, i, j, new_value, duration=0.07, highlight_opacity=0.2
+                        )
+                elif index == 1:
+                    if not (
+                        (i == 0)
+                        or (j == 0)
+                        or (j == len(chunk[0]) - 1)
+                        or (i == (len(chunk) - 1))
+                    ):
+                        square, number = cell
+                        new_value = str(int(number.text) + 1)
+                        self.update_cell_with_neighbors(
+                            chunk, i, j, new_value, duration=0.07, highlight_opacity=0.2
+                        )
+
+        # Move halves back to original positions
+        self.play(chunk.animate.move_to(left_pos))
+
+    def exchange_halos(self, chunk0, chunk1, halo_width):
+        for i, row in enumerate(chunk0):
+            for h in range(halo_width):
+                j_0 = len(chunk0[0]) - 1 + h
+                j_1 = 0 + h
+                square0, text0 = chunk0[i][j_0]
+                square1, text1 = chunk1[i][j_1]
+                new_value0 = text1.text
+                self.play(
+                    Transform(
+                        text0,
+                        Text(new_value0).scale(0.5).move_to(square0.get_center()),
+                    ),
+                    run_time=0.2,
+                )
 
     def construct(self):
         entries = [
@@ -85,7 +186,7 @@ class Chunking(Scene):
         ]
 
         cell_size = 0.5 * len(entries) / 8
-        halo_width = 2
+        halo_width = 1
         n_cols = len(entries[0])
         mid_col = n_cols // 2 + n_cols % 2
 
@@ -101,30 +202,10 @@ class Chunking(Scene):
 
         self.play(FadeOut(grid))
 
-        # Record original positions
-        left_pos = left_half.get_center()
-        right_pos = right_half.get_center()
+        self.update_chunk(left_half, gpu_rect, entries, index=0)
 
-        # Move halves to GPU rectangles
-        self.play(left_half.animate.move_to(gpu_rect.get_center()))
+        self.update_chunk(right_half, gpu_rect, entries, index=1)
 
-        # Example: update numbers in left half
-        for i, row in enumerate(left_half):
-            for j, cell in enumerate(row):
-                if (i == 0) or (j == 0) or (i == (len(left_half) - 1)):
-                    continue
-                else:
-                    square, number = cell
-                    new_value = str(int(entries[i][min(j, n_cols - 1)]) + 1)
-                    self.play(
-                        Transform(
-                            number,
-                            Text(new_value).scale(0.5).move_to(square.get_center()),
-                        ),
-                        run_time=0.1,
-                    )
-
-        # Move halves back to original positions
-        self.play(left_half.animate.move_to(left_pos))
+        # self.exchange_halos(left_half, right_half)
 
         self.wait()
